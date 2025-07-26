@@ -1,3 +1,16 @@
+
+buildscript {
+    repositories { // <--- THIS `repositories` BLOCK MUST BE HERE
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        // This is the correct way to declare the google-services plugin:
+        classpath("com.google.gms:google-services:4.3.15")
+        // You'll also likely have the Android Gradle Plugin here, e.g.:
+        // classpath("com.android.tools.build:gradle:8.3.0")
+    }
+}
 allprojects {
     repositories {
         google()
@@ -19,3 +32,6 @@ subprojects {
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
+
+
+

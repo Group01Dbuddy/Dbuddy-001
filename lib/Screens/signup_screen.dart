@@ -1,5 +1,8 @@
+import 'package:dbuddy/Screens/signin_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:dbuddy/utils/colors_utils.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -23,6 +26,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   void _nextPage() {
     if (_currentPage < 4) {
+      // Check if we are not on the last page
       setState(() {
         _currentPage++;
       });
@@ -30,6 +34,9 @@ class _SignupScreenState extends State<SignupScreen> {
         duration: const Duration(milliseconds: 300),
         curve: Curves.ease,
       );
+    } else {
+      // This means we are on the last page, and _nextPage acts as submit
+      _signUp(); // Call the sign-up function when "Next" is pressed on the last page
     }
   }
 
@@ -57,6 +64,86 @@ class _SignupScreenState extends State<SignupScreen> {
       setState(() {
         birthday = picked;
       });
+    }
+  }
+
+  void _signUp() async {
+    if (emailController.text.trim().isEmpty ||
+        passwordController.text.trim().isEmpty) {
+      // Check mounted before showing SnackBar
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Email and password cannot be empty.")),
+      );
+      return;
+    }
+
+    try {
+      final UserCredential userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: emailController.text.trim(),
+            password: passwordController.text.trim(),
+          );
+
+      User? newUser = userCredential.user;
+
+      if (newUser != null) {
+        await newUser.updateDisplayName(nameController.text.trim());
+
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(newUser.uid)
+            .set({
+              'name': nameController.text.trim(),
+              'email': emailController.text.trim(),
+              'birthday': birthday?.toIso8601String(),
+              'weight': weight,
+              'height': height,
+              'calorieGoal': calorieGoal,
+              'createdAt': FieldValue.serverTimestamp(),
+            });
+
+        // Check mounted before navigating
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const SigninScreen()),
+        );
+      } else {
+        // Check mounted before showing SnackBar
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("User creation failed. Please try again."),
+          ),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      // Check mounted before showing SnackBar in catch block
+      if (!mounted) return;
+      String errorMessage;
+      if (e.code == 'weak-password') {
+        errorMessage = 'The password provided is too weak.';
+      } else if (e.code == 'email-already-in-use') {
+        errorMessage = 'The account already exists for that email.';
+      } else if (e.code == 'invalid-email') {
+        errorMessage = 'The email address is not valid.';
+      } else {
+        errorMessage = 'An error occurred during sign up: ${e.message}';
+      }
+      print("Sign-up error: $errorMessage");
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(errorMessage)));
+    } catch (e) {
+      // Check mounted before showing SnackBar in catch block
+      if (!mounted) return;
+      print("General sign-up error: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("An unexpected error occurred during sign up."),
+        ),
+      );
     }
   }
 
@@ -460,7 +547,14 @@ class _SignupScreenState extends State<SignupScreen> {
                                   ),
                                 ),
                                 onPressed: () {
-                                  // Handle sign up logic here
+                                  _signUp(); // Call the sign-up function
+                                  Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const SigninScreen(),
+                                    ),
+                                  );
                                 },
                                 child: const Text(
                                   "Sign Up",

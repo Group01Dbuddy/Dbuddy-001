@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "492845323290",
+    "project_id": "dbuddy-97725",
+    "storage_bucket": "dbuddy-97725.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:492845323290:android:6c1b45d9e3071e2758ada3",
+        "android_client_info": {
+          "package_name": "com.example.dbuddy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC9aXYKwL0Qtz_QDs2UgMk_hjZoqxXwQbo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
