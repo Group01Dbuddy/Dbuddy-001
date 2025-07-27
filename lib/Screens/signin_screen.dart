@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:dbuddy/utils/colors_utils.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import "package:dbuddy/Screens/home_screen.dart";
+import "package:dbuddy/Screens/dash_board_screen.dart";
 
 class SigninScreen extends StatefulWidget {
   const SigninScreen({super.key});
@@ -18,8 +18,9 @@ class _SigninScreenState extends State<SigninScreen> {
     // Basic validation
     if (emailController.text.trim().isEmpty ||
         passwordController.text.trim().isEmpty) {
-      if (!mounted)
+      if (!mounted) {
         return; // Always check mounted before context-dependent operations
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please enter both email and password.")),
       );
@@ -38,7 +39,7 @@ class _SigninScreenState extends State<SigninScreen> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => const HomeScreen(),
+          builder: (context) => const DashboardScreen(),
         ), // Replace with your actual main screen
       );
     } on FirebaseAuthException catch (e) {
