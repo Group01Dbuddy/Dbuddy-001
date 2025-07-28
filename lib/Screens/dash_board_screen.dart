@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // <--- ADD THIS
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -116,7 +118,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Increased card size for calendar and hydration tracker
     final double cardSize = 150;
     final double iconSize = 32;
 
@@ -246,13 +247,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                // Date Card
                 Container(
                   width: cardSize,
                   height: cardSize,
                   decoration: BoxDecoration(
                     color: primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(16), // more rounded
+                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: primaryColor.withOpacity(0.3)),
                   ),
                   padding: const EdgeInsets.all(12),
@@ -268,7 +268,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Text(
                         _formattedDate(),
                         textAlign: TextAlign.center,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: Colors.black87,
@@ -277,8 +277,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ],
                   ),
                 ),
-
-                // Hydration Tracker
                 Container(
                   width: cardSize,
                   height: cardSize,
@@ -341,7 +339,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
             const SizedBox(height: 25),
 
-            // Meal Reminders Title
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
@@ -355,15 +352,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 12),
 
-            // Meal Reminder Cards
-            _buildReminderCard('Breakfast', Icons.free_breakfast),
-            _buildReminderCard('Lunch', Icons.lunch_dining),
-            _buildReminderCard('Snack', Icons.fastfood),
-            _buildReminderCard('Dinner', Icons.dinner_dining),
+            // Dynamically render all meals
+            ...mealTimes.keys
+                .map((meal) => _buildReminderCard(meal, _getIconForMeal(meal)))
+                .toList(),
+
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.center,
+              child: AddButton(
+                label: "Add Meal",
+                onPressed: _showAddMealDialog,
+              ),
+            ),
           ],
         ),
       ),
-
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         notchMargin: 8,
@@ -387,11 +391,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
       ),
-
       floatingActionButton: FloatingActionButton(
         onPressed: () {},
         backgroundColor: primaryColor,
-        // The FAB is already round by default; no shape change needed
         child: const Icon(Icons.camera_alt),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
@@ -422,8 +424,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildReminderCard(String meal, IconData icon) {
-    final bool enabled = mealEnabled[meal]!;
+    final bool enabled = mealEnabled[meal] ?? true;
     final TimeOfDay time = mealTimes[meal]!;
+
+    final isCustomMeal = ![
+      'Breakfast',
+      'Lunch',
+      'Snack',
+      'Dinner',
+    ].map((e) => e.toLowerCase()).contains(meal.toLowerCase());
 
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -450,6 +459,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
               },
             ),
             Icon(Icons.alarm, color: enabled ? primaryColor : Colors.grey),
+            if (isCustomMeal)
+              IconButton(
+                icon: const Icon(Icons.delete, color: Colors.redAccent),
+                onPressed: () {
+                  _showDeleteConfirmation(meal);
+                },
+              ),
           ],
         ),
         onTap: enabled
@@ -465,5 +481,74 @@ class _DashboardScreenState extends State<DashboardScreen> {
             : null,
       ),
     );
+  }
+
+  void _showDeleteConfirmation(String mealName) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Meal'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Are you sure you want to remove "$mealName"?'),
+            const SizedBox(height: 12),
+            if (!['Breakfast', 'Lunch', 'Snack', 'Dinner'].contains(mealName))
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                icon: const Icon(Icons.delete, color: Colors.white),
+                label: const Text(
+                  'Delete this meal',
+                  style: TextStyle(color: Colors.white),
+                ),
+                onPressed: () {
+                  setState(() {
+                    mealTimes.remove(mealName);
+                    mealEnabled.remove(mealName);
+                  });
+                  Navigator.pop(context);
+                },
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () {
+              setState(() {
+                mealTimes.remove(mealName);
+                mealEnabled.remove(mealName);
+              });
+              Navigator.pop(context);
+            },
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _getIconForMeal(String meal) {
+    switch (meal.toLowerCase()) {
+      case 'breakfast':
+        return Icons.free_breakfast;
+      case 'lunch':
+        return Icons.lunch_dining;
+      case 'snack':
+        return Icons.fastfood;
+      case 'dinner':
+        return Icons.restaurant;
+      default:
+        return Icons.fastfood;
+    }
   }
 }
