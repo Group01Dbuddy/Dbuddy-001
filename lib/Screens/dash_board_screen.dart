@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // <--- ADD THIS
-import 'package:cloud_firestore/cloud_firestore.dart';
+// <--- ADD THIS
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -352,10 +351,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 12),
 
-            // Dynamically render all meals
-            ...mealTimes.keys
-                .map((meal) => _buildReminderCard(meal, _getIconForMeal(meal)))
-                .toList(),
+            ...mealTimes.keys.map(
+              (meal) => _buildReminderCard(meal, _getIconForMeal(meal)),
+            ),
 
             const SizedBox(height: 12),
             Align(

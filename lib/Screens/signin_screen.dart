@@ -75,10 +75,26 @@ class _SigninScreenState extends State<SigninScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Sign In"),
-        backgroundColor: hexStringToColor("#FF450D"),
+        title: const Text("DBUDDY"),
+        titleTextStyle: const TextStyle(
+          fontFamily: 'finger',
+          fontSize: 30,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
         centerTitle: true,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('assets/images/bg.jpg'),
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
       ),
+
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -145,7 +161,7 @@ class _SigninScreenState extends State<SigninScreen> {
                       onPressed: _signIn,
                       child: const Text(
                         "Sign In",
-                        style: TextStyle(fontSize: 18),
+                        style: TextStyle(fontSize: 18, color: Colors.white),
                       ),
                     ),
                   ),
@@ -166,7 +182,7 @@ class _SigninScreenState extends State<SigninScreen> {
                       },
                       child: const Text(
                         "Signup",
-                        style: TextStyle(fontSize: 18),
+                        style: TextStyle(fontSize: 18, color: Colors.white),
                       ),
                     ),
                   ),

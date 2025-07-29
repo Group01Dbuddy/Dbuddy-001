@@ -43,6 +43,8 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.14.0
+
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -53,6 +55,19 @@ dev_dependencies:
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
+flutter_launcher_icons:
+  android: true
+  ios: true
+  windows:
+  generate: true
+  image_path: "assets/images/Dbuddy.png"
+  web:
+    generate: true
+    image_path: "assets/images/Dbuddy.png"
+  macos:
+    generate: true
+    image_path: "assets/images/Dbuddy.png"
+
 
 # The following section is specific to Flutter packages.
 flutter:
@@ -63,6 +78,17 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/profile_placeholder.jpg
+    - assets/images/Dbuddy.png
+    - assets/images/bg.jpg
+
+  fonts:
+    - family: finger
+      fonts:
+        - asset: assets/fonts/finger.otf
+          weight: 400
+        - asset: assets/fonts/finger.otf
+          weight: 700
+
 
   # To add assets to your application, add an assets section, like this:
   # assets:

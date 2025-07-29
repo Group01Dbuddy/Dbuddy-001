@@ -1,5 +1,6 @@
 import 'package:dbuddy/Screens/signin_screen.dart';
 import 'package:dbuddy/Screens/signup_screen.dart';
+import 'package:dbuddy/Screens/splash_logo_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -22,8 +23,11 @@ class MyApp extends StatelessWidget {
           seedColor: const Color.fromARGB(255, 0, 0, 0),
         ),
       ),
-      home: const SigninScreen(),
-      routes: {'/signup_screen': (context) => SignupScreen()},
+      home: const SplashLogoScreen(),
+      routes: {
+        '/signup_screen': (context) => SignupScreen(),
+        '/signin_screen': (context) => SigninScreen(),
+      },
     );
   }
 }

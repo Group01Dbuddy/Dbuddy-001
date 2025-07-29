@@ -14,7 +14,12 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
+  final TextEditingController genderController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+  final TextEditingController goalController = TextEditingController();
+  final TextEditingController activityLevelController = TextEditingController();
+  final TextEditingController confirmPasswordController =
+      TextEditingController();
   DateTime? birthday;
   double? weight;
   double? height;
@@ -25,7 +30,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final PageController _pageController = PageController();
 
   void _nextPage() {
-    if (_currentPage < 4) {
+    if (_currentPage < 5) {
       // Check if we are not on the last page
       setState(() {
         _currentPage++;
@@ -68,12 +73,59 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   void _signUp() async {
-    if (emailController.text.trim().isEmpty ||
-        passwordController.text.trim().isEmpty) {
+    if (passwordController.text.trim() !=
+        confirmPasswordController.text.trim()) {
+      // Check mounted before showing SnackBar
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Passwords do not match.")));
+      return;
+    }
+    if (!emailController.text.trim().contains('@') ||
+        emailController.text.trim().contains(' ')) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Email cannot contain spaces and must need @."),
+        ),
+      );
+      return;
+    }
+
+    if (passwordController.text.trim().length < 6) {
       // Check mounted before showing SnackBar
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Email and password cannot be empty.")),
+        const SnackBar(
+          content: Text("Password must be at least 6 characters long."),
+        ),
+      );
+      return;
+    }
+
+    if (passwordController.text.trim() !=
+        confirmPasswordController.text.trim()) {
+      // Check mounted before showing SnackBar
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Passwords do not match.")));
+      return;
+    }
+    if ((emailController.text.trim().isEmpty ||
+            passwordController.text.trim().isEmpty ||
+            confirmPasswordController.text.trim().isEmpty) ||
+        (confirmPasswordController.text.trim() !=
+            passwordController.text.trim())) {
+      // Check mounted before showing SnackBar
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Email, password and conform password cannot be empty.",
+          ),
+        ),
       );
       return;
     }
@@ -99,7 +151,10 @@ class _SignupScreenState extends State<SignupScreen> {
               'birthday': birthday?.toIso8601String(),
               'weight': weight,
               'height': height,
+              'gender': genderController.text.trim(),
+              'goal': goalController.text.trim(),
               'calorieGoal': calorieGoal,
+              'activityLevel': activityLevelController.text.trim(),
               'createdAt': FieldValue.serverTimestamp(),
             });
 
@@ -151,7 +206,15 @@ class _SignupScreenState extends State<SignupScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Sign Up"),
+        title: const Text(
+          "Sign Up",
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'finger',
+          ),
+        ),
         backgroundColor: hexStringToColor("#FF450D"),
         centerTitle: true,
       ),
@@ -178,7 +241,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Text(
-                          "SIGN UP",
+                          "Main info",
                           style: TextStyle(
                             color: Color.fromARGB(255, 250, 250, 250),
                             fontSize: 32,
@@ -216,7 +279,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                         const SizedBox(height: 20),
                         TextField(
-                          controller: passwordController,
+                          controller: confirmPasswordController,
                           obscureText: true,
                           decoration: InputDecoration(
                             hintText: "Password",
@@ -229,6 +292,22 @@ class _SignupScreenState extends State<SignupScreen> {
                             prefixIcon: const Icon(Icons.lock),
                           ),
                         ),
+                        const SizedBox(height: 20),
+                        TextField(
+                          controller: passwordController,
+                          obscureText: true,
+                          decoration: InputDecoration(
+                            hintText: "Conform Password",
+                            filled: true,
+                            fillColor: Colors.white.withOpacity(0.9),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            prefixIcon: const Icon(Icons.lock),
+                          ),
+                        ),
+
                         const SizedBox(height: 30),
                         SizedBox(
                           width: double.infinity,
@@ -243,21 +322,25 @@ class _SignupScreenState extends State<SignupScreen> {
                             onPressed: _nextPage,
                             child: const Text(
                               "Next",
-                              style: TextStyle(fontSize: 18),
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  // Page 2: Birthday
+                  // Page 2: Birthday and gender
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 32.0),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Text(
-                          "Birthday",
+                          "Birthday and Gender",
                           style: TextStyle(
                             color: Color.fromARGB(255, 250, 250, 250),
                             fontSize: 28,
@@ -295,6 +378,56 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
                         ),
                         const SizedBox(height: 30),
+                        const Text(
+                          "Gender",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            children: [
+                              RadioListTile<String>(
+                                title: const Text("Male"),
+                                value: "Male",
+                                groupValue: genderController.text,
+                                onChanged: (value) {
+                                  setState(() {
+                                    genderController.text = value!;
+                                  });
+                                },
+                              ),
+                              RadioListTile<String>(
+                                title: const Text("Female"),
+                                value: "Female",
+                                groupValue: genderController.text,
+                                onChanged: (value) {
+                                  setState(() {
+                                    genderController.text = value!;
+                                  });
+                                },
+                              ),
+                              RadioListTile<String>(
+                                title: const Text("Other"),
+                                value: "Other",
+                                groupValue: genderController.text,
+                                onChanged: (value) {
+                                  setState(() {
+                                    genderController.text = value!;
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 30),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -316,10 +449,17 @@ class _SignupScreenState extends State<SignupScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
-                              onPressed: birthday != null ? _nextPage : null,
+                              onPressed:
+                                  birthday != null &&
+                                      genderController.text.isNotEmpty
+                                  ? _nextPage
+                                  : null,
                               child: const Text(
                                 "Next",
-                                style: TextStyle(fontSize: 18),
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ],
@@ -327,7 +467,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       ],
                     ),
                   ),
-                  // Page 3: Weight & Height
+                  // Page 3: Active level Weight & Height
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 32.0),
                     child: Column(
@@ -410,7 +550,10 @@ class _SignupScreenState extends State<SignupScreen> {
                                   : null,
                               child: const Text(
                                 "Next",
-                                style: TextStyle(fontSize: 18),
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ],
@@ -478,7 +621,10 @@ class _SignupScreenState extends State<SignupScreen> {
                                   : null,
                               child: const Text(
                                 "Next",
-                                style: TextStyle(fontSize: 18),
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ],
@@ -486,7 +632,125 @@ class _SignupScreenState extends State<SignupScreen> {
                       ],
                     ),
                   ),
-                  // Page 5: Submit
+                  // Page 5: Activity Level
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                    child: Column(
+                      children: [
+                        // 🌟 Activity Level Dropdown
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          child: DropdownButtonFormField<String>(
+                            value:
+                                [
+                                  'Beginner',
+                                  'Intermediate',
+                                  'Advanced',
+                                ].contains(activityLevelController.text)
+                                ? activityLevelController.text
+                                : null,
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              hintText: "Select Activity Level",
+                              prefixIcon: Icon(Icons.fitness_center),
+                              contentPadding: EdgeInsets.symmetric(
+                                vertical: 10,
+                              ),
+                            ),
+                            items: ['Beginner', 'Intermediate', 'Advanced'].map(
+                              (level) {
+                                return DropdownMenuItem<String>(
+                                  value: level,
+                                  child: Text(level),
+                                );
+                              },
+                            ).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                activityLevelController.text = value!;
+                              });
+                            },
+                          ),
+                        ),
+
+                        const SizedBox(height: 16), // spacing between dropdowns
+                        // 🎯 Goal Dropdown
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          child: DropdownButtonFormField<String>(
+                            value:
+                                [
+                                  'Weight Loss',
+                                  'Gain Fat',
+                                  'Balance',
+                                ].contains(goalController.text)
+                                ? goalController.text
+                                : null,
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              hintText: "Select Goal",
+                              prefixIcon: Icon(Icons.track_changes),
+                              contentPadding: EdgeInsets.symmetric(
+                                vertical: 10,
+                              ),
+                            ),
+                            items: ['Weight Loss', 'Gain Fat', 'Balance'].map((
+                              goal,
+                            ) {
+                              return DropdownMenuItem<String>(
+                                value: goal,
+                                child: Text(goal),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                goalController.text = value!;
+                              });
+                            },
+                          ),
+                        ),
+
+                        const SizedBox(height: 30),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: hexStringToColor("#FF450D"),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: (goalController.text != null)
+                                ? _nextPage
+                                : null,
+                            child: const Text(
+                              "Next",
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Page 6: Submit
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 32.0),
                     child: Column(
@@ -516,9 +780,14 @@ class _SignupScreenState extends State<SignupScreen> {
                                 Text(
                                   "Birthday: ${birthday != null ? "${birthday!.day}/${birthday!.month}/${birthday!.year}" : ""}",
                                 ),
+                                Text("Gender: ${genderController.text}"),
+                                Text(
+                                  "Activity Level: ${activityLevelController.text}",
+                                ),
                                 Text("Weight: ${weight ?? ""} kg"),
                                 Text("Height: ${height ?? ""} cm"),
                                 Text("Calorie Goal: ${calorieGoal ?? ""}"),
+                                Text("goal: ${goalController.text}"),
                               ],
                             ),
                           ),
@@ -558,7 +827,10 @@ class _SignupScreenState extends State<SignupScreen> {
                                 },
                                 child: const Text(
                                   "Sign Up",
-                                  style: TextStyle(fontSize: 18),
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ),
                             ),
@@ -567,7 +839,12 @@ class _SignupScreenState extends State<SignupScreen> {
                         const SizedBox(height: 16),
                         TextButton(
                           onPressed: () {
-                            // Handle navigation to sign in screen
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const SigninScreen(),
+                              ),
+                            );
                           },
                           child: const Text(
                             "Already have an account? Sign In",
