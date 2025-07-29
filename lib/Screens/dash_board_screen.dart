@@ -390,7 +390,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
+        onPressed: () {
+          Navigator.pushNamed(context, '/scan_screen');
+        },
         backgroundColor: primaryColor,
         child: const Icon(Icons.camera_alt),
       ),
