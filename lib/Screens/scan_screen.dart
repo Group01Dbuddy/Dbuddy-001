@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class ScanScreen extends StatefulWidget {
-  const ScanScreen({Key? key}) : super(key: key);
+  const ScanScreen({super.key});
 
   @override
   State<ScanScreen> createState() => _ScanScreenState();
@@ -301,8 +301,9 @@ class _ScanScreenState extends State<ScanScreen>
                                 children: [
                                   IconButton(
                                     onPressed: () {
-                                      if (quantity > 0)
+                                      if (quantity > 0) {
                                         setState(() => quantity--);
+                                      }
                                     },
                                     icon: const Icon(
                                       Icons.remove_circle_outline,

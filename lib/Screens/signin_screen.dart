@@ -15,7 +15,7 @@ class _SigninScreenState extends State<SigninScreen> {
   final TextEditingController passwordController = TextEditingController();
 
   void _signIn() async {
-    // Basic validation
+    // Basic validation: Check if email or password fields are empty
     if (emailController.text.trim().isEmpty ||
         passwordController.text.trim().isEmpty) {
       if (!mounted) {
@@ -29,40 +29,77 @@ class _SigninScreenState extends State<SigninScreen> {
 
     try {
       // Attempt to sign in with email and password
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
-      );
+      final UserCredential userCredential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(
+            email: emailController.text.trim(),
+            password: passwordController.text.trim(),
+          );
 
-      // If sign-in is successful, navigate to your main app screen
+      final User? user =
+          userCredential.user; // Get the user object from the credential
+
+      // --- IMPORTANT: Check if the user's email is verified ---
+      if (user != null) {
+        // Reload the user to get the latest email verification status
+        // This is crucial if they just verified their email outside the app
+        await user.reload();
+        // Get the refreshed user object
+        final refreshedUser = FirebaseAuth.instance.currentUser;
+
+        if (refreshedUser != null && !refreshedUser.emailVerified) {
+          // If user exists but email is NOT verified
+          // Optionally, resend verification email if you want to provide that convenience
+          // Make sure not to spam, Firebase has rate limits
+          // await refreshedUser.sendEmailVerification();
+
+          if (!mounted) return; // Check mounted before showing UI
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                "Please verify your email address to continue. Check your inbox for a verification email.",
+              ),
+              duration: Duration(seconds: 6), // Keep message visible longer
+            ),
+          );
+          // Sign out the user immediately so they can't proceed without verification
+          await FirebaseAuth.instance.signOut();
+          return; // Stop the sign-in process here
+        }
+      }
+      // --- END: Email verification check ---
+
+      // If sign-in is successful AND email is verified (or if no email verification is required/configured),
+      // then navigate to your main app screen
       if (!mounted) return; // Check mounted before navigating
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => const DashboardScreen(),
-        ), // Replace with your actual main screen
+          builder: (context) =>
+              const DashboardScreen(), // Navigate to your Dashboard
+        ),
       );
     } on FirebaseAuthException catch (e) {
-      // Check mounted before showing SnackBar in catch block
-      if (!mounted) return;
+      // Handle Firebase Authentication specific errors
+      if (!mounted) return; // Check mounted before showing UI
       String errorMessage;
-      if (e.code == 'user-not-found') {
-        errorMessage = 'No user found for that email.';
-      } else if (e.code == 'wrong-password') {
-        errorMessage = 'Wrong password provided for that user.';
+      if (e.code == 'user-not-found' || e.code == 'wrong-password') {
+        errorMessage =
+            'Invalid email or password.'; // Generic message for security
       } else if (e.code == 'invalid-email') {
-        errorMessage = 'The email address is not valid.';
+        errorMessage = 'The email address format is invalid.';
+      } else if (e.code == 'user-disabled') {
+        errorMessage = 'This account has been disabled.';
       } else {
-        errorMessage = 'An error occurred during sign in: ${e.message}';
+        errorMessage = 'An error occurred: ${e.message}';
       }
-      print("Sign-in error: $errorMessage"); // Log the error for debugging
+      print("Sign-in error: $errorMessage"); // Log full error for debugging
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(errorMessage)));
     } catch (e) {
-      // Catch any other unexpected errors
-      if (!mounted) return; // Check mounted before showing SnackBar
-      print("General sign-in error: $e"); // Log the error for debugging
+      // Catch any other unexpected errors during the sign-in process
+      if (!mounted) return; // Check mounted before showing UI
+      print("General sign-in error: $e"); // Log for debugging
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("An unexpected error occurred during sign in."),
@@ -83,18 +120,22 @@ class _SigninScreenState extends State<SigninScreen> {
           color: Colors.white,
         ),
         centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        backgroundColor: Colors
+            .transparent, // AppBar background will be part of body's decoration
+        elevation: 0, // No shadow
         flexibleSpace: Container(
+          // Background image for the AppBar area
           decoration: const BoxDecoration(
             image: DecorationImage(
-              image: AssetImage('assets/images/bg.jpg'),
+              image: AssetImage(
+                'assets/images/bg.jpg',
+              ), // Ensure this path is correct
               fit: BoxFit.cover,
             ),
           ),
         ),
       ),
-
+      // The body container will hold the gradient background for the rest of the screen
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -158,14 +199,13 @@ class _SigninScreenState extends State<SigninScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      onPressed: _signIn,
+                      onPressed: _signIn, // Calls the _signIn function
                       child: const Text(
                         "Sign In",
                         style: TextStyle(fontSize: 18, color: Colors.white),
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 30),
                   SizedBox(
                     width: double.infinity,
@@ -178,7 +218,10 @@ class _SigninScreenState extends State<SigninScreen> {
                         ),
                       ),
                       onPressed: () {
-                        Navigator.pushNamed(context, '/signup_screen');
+                        Navigator.pushNamed(
+                          context,
+                          '/signup_screen',
+                        ); // Navigates to Signup
                       },
                       child: const Text(
                         "Signup",
@@ -189,7 +232,8 @@ class _SigninScreenState extends State<SigninScreen> {
                   const SizedBox(height: 16),
                   TextButton(
                     onPressed: () {
-                      // Handle forgot password
+                      // TODO: Implement Forgot Password functionality here
+                      // This would typically involve FirebaseAuth.instance.sendPasswordResetEmail(email: ...)
                     },
                     child: const Text(
                       "Forgot Password?",

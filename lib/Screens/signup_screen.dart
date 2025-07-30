@@ -15,11 +15,12 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController genderController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
+  final TextEditingController passwordController =
+      TextEditingController(); // This should be the main password
   final TextEditingController goalController = TextEditingController();
   final TextEditingController activityLevelController = TextEditingController();
   final TextEditingController confirmPasswordController =
-      TextEditingController();
+      TextEditingController(); // This should be the confirm password
   DateTime? birthday;
   double? weight;
   double? height;
@@ -30,8 +31,9 @@ class _SignupScreenState extends State<SignupScreen> {
   final PageController _pageController = PageController();
 
   void _nextPage() {
+    // _currentPage is 0 to 5 for 6 pages (0, 1, 2, 3, 4, 5)
+    // If _currentPage is less than 5, it means we are not on the last page (page 5)
     if (_currentPage < 5) {
-      // Check if we are not on the last page
       setState(() {
         _currentPage++;
       });
@@ -40,7 +42,7 @@ class _SignupScreenState extends State<SignupScreen> {
         curve: Curves.ease,
       );
     } else {
-      // This means we are on the last page, and _nextPage acts as submit
+      // This means we are on the last page (page 5), and _nextPage acts as submit
       _signUp(); // Call the sign-up function when "Next" is pressed on the last page
     }
   }
@@ -73,28 +75,33 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   void _signUp() async {
+    // --- START: Streamlined Validation ---
+    // 1. Check for empty fields
+    if (nameController.text.trim().isEmpty ||
+        emailController.text.trim().isEmpty ||
+        passwordController.text.trim().isEmpty ||
+        confirmPasswordController.text.trim().isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("All fields on the first page are required."),
+        ),
+      );
+      return;
+    }
+
+    // 2. Check password match
     if (passwordController.text.trim() !=
         confirmPasswordController.text.trim()) {
-      // Check mounted before showing SnackBar
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text("Passwords do not match.")));
       return;
     }
-    if (!emailController.text.trim().contains('@') ||
-        emailController.text.trim().contains(' ')) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Email cannot contain spaces and must need @."),
-        ),
-      );
-      return;
-    }
 
+    // 3. Check password length
     if (passwordController.text.trim().length < 6) {
-      // Check mounted before showing SnackBar
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -104,33 +111,20 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
-    if (passwordController.text.trim() !=
-        confirmPasswordController.text.trim()) {
-      // Check mounted before showing SnackBar
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Passwords do not match.")));
-      return;
-    }
-    if ((emailController.text.trim().isEmpty ||
-            passwordController.text.trim().isEmpty ||
-            confirmPasswordController.text.trim().isEmpty) ||
-        (confirmPasswordController.text.trim() !=
-            passwordController.text.trim())) {
-      // Check mounted before showing SnackBar
+    // 4. Basic email format validation
+    if (!emailController.text.trim().contains('@') ||
+        emailController.text.trim().contains(' ')) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Email, password and conform password cannot be empty.",
-          ),
-        ),
+        const SnackBar(content: Text("Please enter a valid email address.")),
       );
       return;
     }
 
+    // --- END: Streamlined Validation ---
+
     try {
+      // 1. Create user in Firebase Authentication
       final UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(
             email: emailController.text.trim(),
@@ -140,32 +134,48 @@ class _SignupScreenState extends State<SignupScreen> {
       User? newUser = userCredential.user;
 
       if (newUser != null) {
+        // Optional: Update display name in Firebase Auth
         await newUser.updateDisplayName(nameController.text.trim());
 
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(newUser.uid)
-            .set({
-              'name': nameController.text.trim(),
-              'email': emailController.text.trim(),
-              'birthday': birthday?.toIso8601String(),
-              'weight': weight,
-              'height': height,
-              'gender': genderController.text.trim(),
-              'goal': goalController.text.trim(),
-              'calorieGoal': calorieGoal,
-              'activityLevel': activityLevelController.text.trim(),
-              'createdAt': FieldValue.serverTimestamp(),
-            });
+        // --- NEW: Send email verification ---
+        await newUser.sendEmailVerification();
+        print("Verification email sent to ${newUser.email}"); // For debugging
 
-        // Check mounted before navigating
+        // 2. Save additional user profile data to Cloud Firestore
+        await FirebaseFirestore.instance.collection('users').doc(newUser.uid).set({
+          'name': nameController.text.trim(),
+          'email': emailController.text.trim(),
+          'birthday': birthday
+              ?.toIso8601String(), // Store birthday as ISO 8601 string
+          'weight': weight,
+          'height': height,
+          'gender': genderController.text.trim(),
+          'goal': goalController.text.trim(),
+          'calorieGoal': calorieGoal,
+          'activityLevel': activityLevelController.text.trim(),
+          'createdAt':
+              FieldValue.serverTimestamp(), // Timestamp for when the user was created
+        });
+
+        // 3. Inform user and navigate to SigninScreen
         if (!mounted) return;
-        Navigator.pushReplacement(
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Account created! Please verify your email to log in.",
+            ),
+            duration: Duration(
+              seconds: 5,
+            ), // Keep the message visible a bit longer
+          ),
+        );
+        // Using pushAndRemoveUntil to clear the signup stack and go back to SigninScreen
+        Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const SigninScreen()),
+          (Route<dynamic> route) => false, // Remove all previous routes
         );
       } else {
-        // Check mounted before showing SnackBar
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -174,7 +184,6 @@ class _SignupScreenState extends State<SignupScreen> {
         );
       }
     } on FirebaseAuthException catch (e) {
-      // Check mounted before showing SnackBar in catch block
       if (!mounted) return;
       String errorMessage;
       if (e.code == 'weak-password') {
@@ -191,7 +200,6 @@ class _SignupScreenState extends State<SignupScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text(errorMessage)));
     } catch (e) {
-      // Check mounted before showing SnackBar in catch block
       if (!mounted) return;
       print("General sign-up error: $e");
       ScaffoldMessenger.of(context).showSnackBar(
@@ -278,8 +286,9 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
                         ),
                         const SizedBox(height: 20),
+                        // Corrected: passwordController for "Password"
                         TextField(
-                          controller: confirmPasswordController,
+                          controller: passwordController,
                           obscureText: true,
                           decoration: InputDecoration(
                             hintText: "Password",
@@ -293,11 +302,13 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
                         ),
                         const SizedBox(height: 20),
+                        // Corrected: confirmPasswordController for "Confirm Password"
                         TextField(
-                          controller: passwordController,
+                          controller: confirmPasswordController,
                           obscureText: true,
                           decoration: InputDecoration(
-                            hintText: "Conform Password",
+                            hintText:
+                                "Confirm Password", // Changed from "Conform"
                             filled: true,
                             fillColor: Colors.white.withOpacity(0.9),
                             border: OutlineInputBorder(
@@ -632,11 +643,22 @@ class _SignupScreenState extends State<SignupScreen> {
                       ],
                     ),
                   ),
-                  // Page 5: Activity Level
+                  // Page 5: Activity Level & Goal
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 32.0),
                     child: Column(
+                      mainAxisAlignment:
+                          MainAxisAlignment.center, // Center content vertically
                       children: [
+                        const Text(
+                          "Activity & Goal",
+                          style: TextStyle(
+                            color: Color.fromARGB(255, 250, 250, 250),
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 40),
                         // 🌟 Activity Level Dropdown
                         Container(
                           decoration: BoxDecoration(
@@ -648,6 +670,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             vertical: 4,
                           ),
                           child: DropdownButtonFormField<String>(
+                            // Ensure the value matches an item, or set to null initially
                             value:
                                 [
                                   'Beginner',
@@ -692,6 +715,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             vertical: 4,
                           ),
                           child: DropdownButtonFormField<String>(
+                            // Ensure the value matches an item, or set to null initially
                             value:
                                 [
                                   'Weight Loss',
@@ -725,32 +749,46 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
 
                         const SizedBox(height: 30),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: hexStringToColor("#FF450D"),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            TextButton(
+                              onPressed: _prevPage,
+                              child: const Text(
+                                "Back",
+                                style: TextStyle(color: Colors.white),
                               ),
                             ),
-                            onPressed: (goalController.text != null)
-                                ? _nextPage
-                                : null,
-                            child: const Text(
-                              "Next",
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.white,
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: hexStringToColor("#FF450D"),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                  horizontal: 32,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed:
+                                  (goalController.text.isNotEmpty &&
+                                      activityLevelController.text.isNotEmpty)
+                                  ? _nextPage // This will now trigger _signUp
+                                  : null,
+                              child: const Text(
+                                "Next",
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ),
                       ],
                     ),
                   ),
-                  // Page 6: Submit
+                  // Page 6: Review & Submit
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 32.0),
                     child: Column(
@@ -787,7 +825,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                 Text("Weight: ${weight ?? ""} kg"),
                                 Text("Height: ${height ?? ""} cm"),
                                 Text("Calorie Goal: ${calorieGoal ?? ""}"),
-                                Text("goal: ${goalController.text}"),
+                                Text("Goal: ${goalController.text}"),
                               ],
                             ),
                           ),
@@ -815,16 +853,9 @@ class _SignupScreenState extends State<SignupScreen> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
-                                onPressed: () {
-                                  _signUp(); // Call the sign-up function
-                                  Navigator.pushReplacement(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const SigninScreen(),
-                                    ),
-                                  );
-                                },
+                                // This button directly calls _signUp because _nextPage
+                                // handles the final page transition to _signUp logic
+                                onPressed: _signUp,
                                 child: const Text(
                                   "Sign Up",
                                   style: TextStyle(
