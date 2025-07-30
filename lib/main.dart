@@ -1,3 +1,5 @@
+import 'package:dbuddy/Screens/dash_board_screen.dart';
+import 'package:dbuddy/Screens/profile_screen.dart';
 import 'package:dbuddy/Screens/scan_screen.dart';
 import 'package:dbuddy/Screens/signin_screen.dart';
 import 'package:dbuddy/Screens/signup_screen.dart';
@@ -30,6 +32,9 @@ class MyApp extends StatelessWidget {
         '/signin_screen': (context) => SigninScreen(),
         '/scan_screen': (context) =>
             const ScanScreen(), // Placeholder for camera screen
+        '/splash_logo_screen': (context) => const SplashLogoScreen(),
+        '/profile_screen': (context) => const ProfileScreen(),
+        '/dashboard_screen': (context) => const DashboardScreen(),
       },
     );
   }
