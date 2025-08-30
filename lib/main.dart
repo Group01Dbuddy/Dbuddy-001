@@ -3,7 +3,7 @@ import 'package:dbuddy/Screens/profile_screen.dart';
 import 'package:dbuddy/Screens/scan_screen.dart';
 import 'package:dbuddy/Screens/signin_screen.dart';
 import 'package:dbuddy/Screens/signup_screen.dart';
-import 'package:dbuddy/Screens/splash_logo_screen.dart';
+import 'package:dbuddy/Screens/splash_logo_screen.dart' hide DashboardScreen;
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -28,8 +28,8 @@ class MyApp extends StatelessWidget {
       ),
       home: const SplashLogoScreen(),
       routes: {
-        '/signup_screen': (context) => SignupScreen(),
-        '/signin_screen': (context) => SigninScreen(),
+        '/signup_screen': (context) => const SignupScreen(),
+        '/signin_screen': (context) => const SigninScreen(),
         '/scan_screen': (context) =>
             const ScanScreen(), // Placeholder for camera screen
         '/splash_logo_screen': (context) => const SplashLogoScreen(),

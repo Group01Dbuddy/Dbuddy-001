@@ -12,12 +12,15 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final Color primaryColor = const Color.fromARGB(255, 246, 124, 42);
-  int consumedCalories = 0;
-  int totalCalories = 2000;
+  int consumedCalories = 1000;
+  int totalCalories = 8000;
   int waterIntake = 3;
   final int waterGoal = 8;
   String userName = 'User';
   String userImage = 'assets/images/profile_placeholder.jpg';
+  late final DateTime now;
+  late final DateTime startOfToday;
+  late final DateTime startOfNextDay;
 
   Map<String, int> mealConsumedCalories = {
     'Breakfast': 0,
@@ -26,14 +29,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     'Dinner': 0,
   };
 
-  final Map<String, TimeOfDay> mealTimes = {
+  Map<String, TimeOfDay> mealTimes = {
     'Breakfast': const TimeOfDay(hour: 8, minute: 0),
     'Lunch': const TimeOfDay(hour: 12, minute: 30),
     'Snack': const TimeOfDay(hour: 16, minute: 0),
     'Dinner': const TimeOfDay(hour: 19, minute: 30),
   };
 
-  final Map<String, bool> mealEnabled = {
+  Map<String, bool> mealEnabled = {
     'Breakfast': true,
     'Lunch': true,
     'Snack': true,
@@ -43,47 +46,139 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    now = DateTime.now();
+    startOfToday = DateTime(now.year, now.month, now.day);
+    startOfNextDay = startOfToday.add(const Duration(days: 1));
     _loadUserData();
+    _listenToTodayMealRecords();
   }
 
   Future<void> _loadUserData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final doc = await FirebaseFirestore.instance
+    // 1. Fetch user profile data from the 'users' collection
+    // This part remains mostly the same, fetching name, profile image, and calorie goal.
+    final userDoc = await FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
         .get();
-    if (doc.exists) {
-      final data = doc.data()!;
+
+    if (userDoc.exists) {
+      final userData = userDoc.data()!;
       setState(() {
-        userName = data['name'] ?? 'User';
-        userImage = data['profileImage'] ?? userImage;
-        totalCalories = data['calorieGoal'] ?? totalCalories;
-        consumedCalories = data['consumedCalories'] ?? consumedCalories;
+        userName = userData['name'] ?? 'User';
+        userImage = userData['profileImage'] ?? userImage;
+        totalCalories =
+            userData['calorieGoal'] ?? totalCalories; // Your daily calorie goal
+        // consumedCalories will be loaded from user_daily_progress below
         mealConsumedCalories = Map<String, int>.from(
-          data['mealConsumedCalories'] ?? mealConsumedCalories,
+          userData['mealConsumedCalories'] ?? mealConsumedCalories,
         );
+      });
+    }
+
+    // 2. Fetch consumed calories for today from the 'user_daily_progress' collection
+    // We'll use the user's email and today's date to find the specific daily record.
+    final now = DateTime.now();
+    // To query by date, we need to create a DateTime object representing the start of today.
+    // This ensures we match records for the entire day, regardless of time.
+    final startOfToday = DateTime(now.year, now.month, now.day);
+
+    // Firestore stores dates as Timestamps. It's crucial that the 'date' field
+    // in your 'user_daily_progress' collection is stored as a Firestore Timestamp
+    // representing the start of the day for this query to work correctly.
+    final todayTimestamp = Timestamp.fromDate(startOfToday);
+
+    try {
+      final dailyProgressQuery = await FirebaseFirestore.instance
+          .collection('user_daily_progress')
+          .where(
+            'date',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday),
+          )
+          .where('date', isLessThan: Timestamp.fromDate(startOfNextDay))
+          .limit(1) // Still limit to 1 if you expect only one daily record
+          .get();
+
+      if (dailyProgressQuery.docs.isNotEmpty) {
+        final dailyData = dailyProgressQuery.docs.first.data();
+        setState(() {
+          // Update consumedCalories from the daily progress record
+          consumedCalories = dailyData['consumedCalories'] ?? 0;
+        });
+      } else {
+        // If no record exists for today yet, ensure consumedCalories is reset or set to 0.
+        setState(() {
+          consumedCalories = 0;
+        });
+      }
+    } catch (e) {
+      print("Error loading daily progress: $e");
+      // Handle error, maybe set consumedCalories to 0 or display a message
+      setState(() {
+        consumedCalories = 0;
       });
     }
   }
 
+  void _listenToTodayMealRecords() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final userDoc = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid);
+
+    userDoc
+        .collection('mealRecords')
+        .where(
+          'timestamp',
+          isGreaterThanOrEqualTo: DateTime(
+            DateTime.now().year,
+            DateTime.now().month,
+            DateTime.now().day,
+          ),
+        )
+        .snapshots()
+        .listen((snapshot) async {
+          int totalCaloriesToday = 0;
+          for (var doc in snapshot.docs) {
+            totalCaloriesToday += (doc.data()['calories'] ?? 0) as int;
+          }
+
+          final userData = await userDoc.get();
+          int calorieLimit = userData.data()?['calorieGoal'] ?? 2000;
+
+          setState(() {
+            consumedCalories = totalCaloriesToday;
+            totalCalories = calorieLimit;
+          });
+        });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 400;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.white,
+        leading: null,
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'SDB',
+              'DBuddy',
               style: TextStyle(
+                fontFamily: 'finger',
                 color: primaryColor,
-                fontSize: 24,
+                fontSize: 28,
                 fontWeight: FontWeight.bold,
+                letterSpacing: 1.5,
               ),
             ),
             GestureDetector(
@@ -121,9 +216,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           children: [
             _buildCalorieProgress(),
-            const SizedBox(height: 20),
-            _buildHydrationRow(),
-            const SizedBox(height: 25),
+            const SizedBox(height: 16),
+            _buildHydrationRow(isSmallScreen),
+            const SizedBox(height: 22),
             _buildMealReminderSection(),
           ],
         ),
@@ -224,42 +319,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildHydrationRow() {
+  Widget _buildHydrationRow(bool isSmallScreen) {
+    double cardHeight = isSmallScreen ? 120 : 140;
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildCard(icon: Icons.calendar_today, label: _formattedDate()),
-        _buildCard(
-          icon: Icons.water_drop,
-          label: '$waterIntake / $waterGoal cups',
-          button: ElevatedButton(
-            onPressed: () {
-              setState(() {
-                if (waterIntake < waterGoal) waterIntake++;
-              });
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              minimumSize: const Size(40, 26),
-            ),
-            child: const Text('Add', style: TextStyle(color: Colors.white)),
+        Expanded(
+          child: _buildCard(
+            icon: Icons.calendar_today,
+            label: _formattedDate(),
+            height: cardHeight,
+            iconSize: 30,
           ),
         ),
+        const SizedBox(width: 20), // Increased gap
+        Expanded(child: _buildHydrationCard(cardHeight)),
       ],
     );
   }
 
-  Widget _buildCard({
-    required IconData icon,
-    required String label,
-    Widget? button,
-  }) {
+  Widget _buildHydrationCard(double height) {
     return Container(
-      width: 150,
-      height: 150,
+      height: height,
       decoration: BoxDecoration(
         color: primaryColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(16),
@@ -269,14 +350,93 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 32, color: primaryColor),
+          Icon(Icons.water_drop, size: 28, color: primaryColor),
+          const SizedBox(height: 10),
+          Text(
+            '$waterIntake / $waterGoal cups',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _hydrationButton(
+                icon: Icons.remove,
+                onTap: () {
+                  setState(() {
+                    if (waterIntake > 0) waterIntake--;
+                  });
+                },
+                color: primaryColor,
+                iconSize: 18,
+                splashRadius: 18,
+              ),
+              const SizedBox(width: 8),
+              _hydrationButton(
+                icon: Icons.add,
+                onTap: () {
+                  setState(() {
+                    if (waterIntake < waterGoal) waterIntake++;
+                  });
+                },
+                color: primaryColor,
+                iconSize: 18,
+                splashRadius: 18,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _hydrationButton({
+    required IconData icon,
+    required VoidCallback onTap,
+    required Color color,
+    double iconSize = 18,
+    double splashRadius = 18,
+  }) {
+    return Container(
+      width: 20,
+      height: 20,
+      margin: const EdgeInsets.symmetric(horizontal: 1),
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      child: IconButton(
+        icon: Icon(icon, color: Colors.white, size: iconSize),
+        onPressed: onTap,
+        splashRadius: splashRadius,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
+      ),
+    );
+  }
+
+  Widget _buildCard({
+    required IconData icon,
+    required String label,
+    double height = 140,
+    double iconSize = 40,
+  }) {
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        color: primaryColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: primaryColor.withOpacity(0.3)),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: iconSize, color: primaryColor),
           const SizedBox(height: 12),
           Text(
             label,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontWeight: FontWeight.bold),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
-          if (button != null) ...[const SizedBox(height: 8), button],
         ],
       ),
     );
@@ -306,14 +466,120 @@ class _DashboardScreenState extends State<DashboardScreen> {
               leading: Icon(_getIconForMeal(meal), color: primaryColor),
               title: Text(meal),
               subtitle: Text(time.format(context)),
-              trailing: Switch(
-                value: mealEnabled[meal]!,
-                activeColor: primaryColor,
-                onChanged: (val) => setState(() => mealEnabled[meal] = val),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.alarm, color: Colors.orange),
+                    tooltip: 'Set Reminder',
+                    onPressed: () async {
+                      final picked = await showTimePicker(
+                        context: context,
+                        initialTime: time,
+                      );
+                      if (picked != null && picked != time) {
+                        setState(() {
+                          mealTimes[meal] = picked;
+                        });
+                        // TODO: Save to Firestore if needed
+                      }
+                    },
+                  ),
+                  Switch(
+                    value: mealEnabled[meal]!,
+                    activeColor: primaryColor,
+                    onChanged: (val) => setState(() => mealEnabled[meal] = val),
+                  ),
+                ],
               ),
             ),
           );
         }).toList(),
+        // Add More Button
+        Center(
+          child: TextButton.icon(
+            icon: Icon(Icons.add_circle, color: primaryColor),
+            label: Text(
+              "Add More",
+              style: TextStyle(
+                color: primaryColor,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            onPressed: () async {
+              String? newMeal;
+              TimeOfDay? newTime;
+              final controller = TextEditingController();
+              await showDialog(
+                context: context,
+                builder: (context) {
+                  return StatefulBuilder(
+                    builder: (context, setStateDialog) {
+                      return AlertDialog(
+                        title: const Text("Add New Meal Reminder"),
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextField(
+                              controller: controller,
+                              decoration: const InputDecoration(
+                                labelText: "Meal Name",
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.access_time),
+                              label: Text(
+                                newTime == null
+                                    ? "Pick Time"
+                                    : newTime!.format(context),
+                              ),
+                              onPressed: () async {
+                                final picked = await showTimePicker(
+                                  context: context,
+                                  initialTime: TimeOfDay.now(),
+                                );
+                                if (picked != null) {
+                                  setStateDialog(() {
+                                    newTime = picked;
+                                  });
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                        actions: [
+                          TextButton(
+                            child: const Text("Cancel"),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                          TextButton(
+                            child: const Text("Add"),
+                            onPressed: () {
+                              newMeal = controller.text.trim();
+                              if (newMeal != null &&
+                                  newMeal!.isNotEmpty &&
+                                  newTime != null) {
+                                Navigator.of(context).pop();
+                              }
+                            },
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
+              );
+              if (newMeal != null && newMeal!.isNotEmpty && newTime != null) {
+                setState(() {
+                  mealTimes[newMeal!] = newTime!;
+                  mealEnabled[newMeal!] = true;
+                });
+                // TODO: Save to Firestore if needed
+              }
+            },
+          ),
+        ),
       ],
     );
   }
