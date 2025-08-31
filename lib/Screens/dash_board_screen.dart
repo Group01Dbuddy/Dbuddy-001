@@ -51,14 +51,88 @@ class _DashboardScreenState extends State<DashboardScreen> {
     startOfNextDay = startOfToday.add(const Duration(days: 1));
     _loadUserData();
     _listenToTodayMealRecords();
+    _checkOrCreateDailyProgressRecord();
+  }
+
+  Future<void> _checkOrCreateDailyProgressRecord() async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    // --- DEBUG: Confirm user status ---
+    print('DEBUG: _checkOrCreateDailyProgressRecord called.');
+    if (user == null) {
+      print(
+        'DEBUG: No user logged in. Cannot check/create daily progress record.',
+      );
+      return; // Cannot proceed without a logged-in user
+    }
+    if (user.email == null) {
+      print(
+        'DEBUG: User email is null (${user.uid}). Cannot create daily progress record by email.',
+      );
+      return; // Email is required for your primary key setup
+    }
+    print(
+      'DEBUG: User ${user.email} is logged in. Proceeding to check daily progress.',
+    );
+
+    // Define today's date range (start of today up to, but not including, start of tomorrow)
+    final now = DateTime.now();
+    final startOfToday = DateTime(now.year, now.month, now.day);
+    final startOfNextDay = startOfToday.add(const Duration(days: 1));
+
+    // For the new record's 'date' field in Firestore
+    final todayTimestamp = Timestamp.fromDate(startOfToday);
+
+    try {
+      // 1. Check if a record already exists for today for this user
+      print(
+        'DEBUG: Querying user_daily_progress for email: ${user.email}, date: >= ${startOfToday.toIso8601String()} and < ${startOfNextDay.toIso8601String()}',
+      );
+      final dailyProgressQuery = await FirebaseFirestore.instance
+          .collection('user_daily_progress')
+          .where('email', isEqualTo: user.email)
+          .where('date', isGreaterThanOrEqualTo: todayTimestamp)
+          .where('date', isLessThan: Timestamp.fromDate(startOfNextDay))
+          .limit(1) // We only need to find one to know it exists
+          .get();
+
+      // --- DEBUG: Log query results ---
+      print(
+        'DEBUG: Firestore query completed. Found ${dailyProgressQuery.docs.length} documents.',
+      );
+
+      if (dailyProgressQuery.docs.isEmpty) {
+        // 2. No record found for today, so create a new one
+        print(
+          'DEBUG: No daily progress record found for ${user.email} on ${startOfToday.toIso8601String()}. Creating new record.',
+        );
+
+        await FirebaseFirestore.instance.collection('user_daily_progress').add({
+          'consumedCalories': 0, // Initialize consumed calories for the new day
+          'date': todayTimestamp, // Store the start of today as the date
+          'email': user.email,
+          'waterIntake': 0, // Add water intake here to initialize it
+          // You might want to add other fields here if your daily progress document
+          // is expected to have more default values (e.g., waterIntake: 0, etc.)
+        });
+        print('DEBUG: New daily progress record created successfully.');
+      } else {
+        // 3. Record already exists, no action needed for creation
+        print(
+          'DEBUG: Daily progress record already exists for ${user.email} on ${startOfToday.toIso8601String()}. Document ID: ${dailyProgressQuery.docs.first.id}',
+        );
+        // Optional: print the data of the existing record for inspection
+        // print('DEBUG: Existing record data: ${dailyProgressQuery.docs.first.data()}');
+      }
+    } catch (e) {
+      print('ERROR: Error checking or creating daily progress record: $e');
+      // You might want to show a SnackBar or another UI feedback for the error
+    }
   }
 
   Future<void> _loadUserData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-
-    // 1. Fetch user profile data from the 'users' collection
-    // This part remains mostly the same, fetching name, profile image, and calorie goal.
     final userDoc = await FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
@@ -110,7 +184,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       } else {
         // If no record exists for today yet, ensure consumedCalories is reset or set to 0.
         setState(() {
-          consumedCalories = 0;
+          _checkOrCreateDailyProgressRecord();
         });
       }
     } catch (e) {
