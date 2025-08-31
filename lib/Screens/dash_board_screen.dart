@@ -51,7 +51,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     startOfNextDay = startOfToday.add(const Duration(days: 1));
     _loadUserData();
     _listenToTodayMealRecords();
-    _checkOrCreateDailyProgressRecord();
+    // _checkOrCreateDailyProgressRecord(); // Now handled in _loadUserData
   }
 
   Future<void> _checkOrCreateDailyProgressRecord() async {
@@ -84,55 +84,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final todayTimestamp = Timestamp.fromDate(startOfToday);
 
     try {
-      // 1. Check if a record already exists for today for this user
+      // 1. Check if a record already exists for today for this user (subcollection)
+      final userDocRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid);
       print(
-        'DEBUG: Querying user_daily_progress for email: ${user.email}, date: >= ${startOfToday.toIso8601String()} and < ${startOfNextDay.toIso8601String()}',
+        'DEBUG: Querying user_daily_progress subcollection for user: ${user.uid}, date: >= ${startOfToday.toIso8601String()} and < ${startOfNextDay.toIso8601String()}',
       );
-      final dailyProgressQuery = await FirebaseFirestore.instance
+      final dailyProgressQuery = await userDocRef
           .collection('user_daily_progress')
-          .where('email', isEqualTo: user.email)
           .where('date', isGreaterThanOrEqualTo: todayTimestamp)
           .where('date', isLessThan: Timestamp.fromDate(startOfNextDay))
-          .limit(1) // We only need to find one to know it exists
+          .limit(1)
           .get();
 
-      // --- DEBUG: Log query results ---
       print(
         'DEBUG: Firestore query completed. Found ${dailyProgressQuery.docs.length} documents.',
       );
 
       if (dailyProgressQuery.docs.isEmpty) {
-        // 2. No record found for today, so create a new one
         print(
-          'DEBUG: No daily progress record found for ${user.email} on ${startOfToday.toIso8601String()}. Creating new record.',
+          'DEBUG: No daily progress record found for user ${user.uid} on ${startOfToday.toIso8601String()}. Creating new record.',
         );
-
-        await FirebaseFirestore.instance.collection('user_daily_progress').add({
-          'consumedCalories': 0, // Initialize consumed calories for the new day
-          'date': todayTimestamp, // Store the start of today as the date
-          'email': user.email,
-          'waterIntake': 0, // Add water intake here to initialize it
-          // You might want to add other fields here if your daily progress document
-          // is expected to have more default values (e.g., waterIntake: 0, etc.)
+        await userDocRef.collection('user_daily_progress').add({
+          'consumedCalories': 0,
+          'date': todayTimestamp,
+          'waterIntake': 0,
         });
         print('DEBUG: New daily progress record created successfully.');
       } else {
-        // 3. Record already exists, no action needed for creation
         print(
-          'DEBUG: Daily progress record already exists for ${user.email} on ${startOfToday.toIso8601String()}. Document ID: ${dailyProgressQuery.docs.first.id}',
+          'DEBUG: Daily progress record already exists for user ${user.uid} on ${startOfToday.toIso8601String()}. Document ID: ${dailyProgressQuery.docs.first.id}',
         );
-        // Optional: print the data of the existing record for inspection
-        // print('DEBUG: Existing record data: ${dailyProgressQuery.docs.first.data()}');
       }
     } catch (e) {
       print('ERROR: Error checking or creating daily progress record: $e');
-      // You might want to show a SnackBar or another UI feedback for the error
     }
   }
 
   Future<void> _loadUserData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
+
+    // 1. Fetch user profile data from the 'users' collection
     final userDoc = await FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
@@ -143,53 +137,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
       setState(() {
         userName = userData['name'] ?? 'User';
         userImage = userData['profileImage'] ?? userImage;
-        totalCalories =
-            userData['calorieGoal'] ?? totalCalories; // Your daily calorie goal
-        // consumedCalories will be loaded from user_daily_progress below
+        totalCalories = userData['calorieGoal'] ?? totalCalories;
         mealConsumedCalories = Map<String, int>.from(
           userData['mealConsumedCalories'] ?? mealConsumedCalories,
         );
       });
     }
 
-    // 2. Fetch consumed calories for today from the 'user_daily_progress' collection
-    // We'll use the user's email and today's date to find the specific daily record.
+    // 2. Fetch consumed calories for today from the 'user_daily_progress' subcollection under user
     final now = DateTime.now();
-    // To query by date, we need to create a DateTime object representing the start of today.
-    // This ensures we match records for the entire day, regardless of time.
     final startOfToday = DateTime(now.year, now.month, now.day);
-
-    // Firestore stores dates as Timestamps. It's crucial that the 'date' field
-    // in your 'user_daily_progress' collection is stored as a Firestore Timestamp
-    // representing the start of the day for this query to work correctly.
-    final todayTimestamp = Timestamp.fromDate(startOfToday);
+    final startOfNextDay = startOfToday.add(const Duration(days: 1));
 
     try {
-      final dailyProgressQuery = await FirebaseFirestore.instance
+      final userDocRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid);
+      final dailyProgressQuery = await userDocRef
           .collection('user_daily_progress')
           .where(
             'date',
             isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday),
           )
           .where('date', isLessThan: Timestamp.fromDate(startOfNextDay))
-          .limit(1) // Still limit to 1 if you expect only one daily record
+          .limit(1)
           .get();
 
       if (dailyProgressQuery.docs.isNotEmpty) {
         final dailyData = dailyProgressQuery.docs.first.data();
         setState(() {
-          // Update consumedCalories from the daily progress record
           consumedCalories = dailyData['consumedCalories'] ?? 0;
         });
       } else {
-        // If no record exists for today yet, ensure consumedCalories is reset or set to 0.
-        setState(() {
-          _checkOrCreateDailyProgressRecord();
-        });
+        // If no record exists for today yet, create it and re-fetch
+        await _checkOrCreateDailyProgressRecord();
+        // Try to fetch again after creation
+        final retryQuery = await userDocRef
+            .collection('user_daily_progress')
+            .where(
+              'date',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday),
+            )
+            .where('date', isLessThan: Timestamp.fromDate(startOfNextDay))
+            .limit(1)
+            .get();
+        if (retryQuery.docs.isNotEmpty) {
+          final dailyData = retryQuery.docs.first.data();
+          setState(() {
+            consumedCalories = dailyData['consumedCalories'] ?? 0;
+          });
+        } else {
+          setState(() {
+            consumedCalories = 0;
+          });
+        }
       }
     } catch (e) {
       print("Error loading daily progress: $e");
-      // Handle error, maybe set consumedCalories to 0 or display a message
       setState(() {
         consumedCalories = 0;
       });
