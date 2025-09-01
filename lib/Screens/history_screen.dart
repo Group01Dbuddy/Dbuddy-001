@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'profile_screen.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -57,47 +57,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
           icon: Icon(Icons.arrow_back, color: primaryColor),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'DBuddy',
-              style: TextStyle(
-                fontFamily: 'finger',
-                color: primaryColor,
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.5,
-              ),
-            ),
-            GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ProfileScreen(),
-                  ),
-                );
-              },
-              child: Row(
-                children: [
-                  Text(
-                    'Hi, $userName!',
-                    style: TextStyle(
-                      color: primaryColor,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundImage: AssetImage(userImage),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        title: Text(
+          'History',
+          style: GoogleFonts.poppins(
+            color: primaryColor,
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       body: StreamBuilder<QuerySnapshot>(
@@ -207,36 +173,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
             },
           );
         },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.pushNamed(context, '/scan_screen');
-        },
-        backgroundColor: primaryColor,
-        child: const Icon(Icons.camera_alt),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar: BottomAppBar(
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 8,
-        child: SizedBox(
-          height: 60,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.home),
-                onPressed: () =>
-                    Navigator.pushNamed(context, '/dashboard_screen'),
-              ),
-              const SizedBox(width: 48),
-              IconButton(
-                icon: Icon(Icons.history, color: primaryColor),
-                onPressed: () {}, // Already on history
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

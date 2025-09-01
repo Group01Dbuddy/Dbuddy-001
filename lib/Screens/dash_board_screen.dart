@@ -1,3 +1,4 @@
+import 'package:dbuddy/Screens/notification_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -347,7 +348,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
               IconButton(
                 icon: const Icon(Icons.notifications),
                 onPressed: () {
-                  // TODO: Navigate to notifications screen if exists
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const NotificationScreen(),
+                    ),
+                  );
                 },
               ),
               const SizedBox(width: 48),
