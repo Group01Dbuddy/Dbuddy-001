@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'profile_screen.dart';
+import 'history_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -12,8 +13,8 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final Color primaryColor = const Color.fromARGB(255, 246, 124, 42);
-  int consumedCalories = 1000;
-  int totalCalories = 8000;
+  int consumedCalories = 0;
+  int totalCalories = 1000;
   int waterIntake = 3;
   final int waterGoal = 8;
   String userName = 'User';
@@ -119,6 +120,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     } catch (e) {
       print('ERROR: Error checking or creating daily progress record: $e');
+    }
+  }
+
+  Future<void> _updateUserDailyProgress(int newConsumedCalories) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final userDocRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid);
+
+    final dailyProgressQuery = await userDocRef
+        .collection('user_daily_progress')
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday))
+        .where('date', isLessThan: Timestamp.fromDate(startOfNextDay))
+        .limit(1)
+        .get();
+
+    if (dailyProgressQuery.docs.isNotEmpty) {
+      final docId = dailyProgressQuery.docs.first.id;
+      await userDocRef.collection('user_daily_progress').doc(docId).update({
+        'consumedCalories': newConsumedCalories,
+      });
+      print('DEBUG: Updated consumedCalories to $newConsumedCalories');
+    } else {
+      print('DEBUG: No daily progress record found to update.');
     }
   }
 
@@ -316,10 +343,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
           height: 60,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: const [
-              Icon(Icons.notifications),
-              SizedBox(width: 48),
-              Icon(Icons.history),
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications),
+                onPressed: () {
+                  // TODO: Navigate to notifications screen if exists
+                },
+              ),
+              const SizedBox(width: 48),
+              IconButton(
+                icon: const Icon(Icons.history),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const HistoryScreen(),
+                    ),
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -572,7 +614,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
           );
-        }).toList(),
+        }),
         // Add More Button
         Center(
           child: TextButton.icon(
