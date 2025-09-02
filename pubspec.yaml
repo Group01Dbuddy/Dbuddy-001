@@ -36,12 +36,14 @@ dependencies:
   firebase_messaging: ^15.2.3 # For Firebase Cloud Messaging
   google_fonts: ^6.1.0 # For using Google Fonts in the app
   image_picker: ^1.0.7
-
+  tflite_flutter: ^0.11.0
+  http: ^1.2.2
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   camera: ^0.11.2
+  image: ^4.0.0
 
 
 dev_dependencies:
@@ -84,6 +86,9 @@ flutter:
     - assets/images/profile_placeholder.jpg
     - assets/images/Dbuddy.png
     - assets/images/bg.jpg
+    - assets/ml_parts/class_names.json
+    - assets/ml_parts/food_b7_final_fp16.tflite
+    - assets/ml_parts/food_calories.json
 
   fonts:
     - family: finger

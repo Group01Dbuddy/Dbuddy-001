@@ -289,7 +289,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             GestureDetector(
               onTap: () {
-                Navigator.push(
+                Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
                     builder: (context) => const ProfileScreen(),

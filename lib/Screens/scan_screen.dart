@@ -1,8 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image/image.dart' as img;
+import 'package:image_picker/image_picker.dart';
+import 'package:dbuddy/Screens/result_screen.dart';
 
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
@@ -18,18 +22,11 @@ class _ScanScreenState extends State<ScanScreen>
   late Animation<double> _scaleAnimation;
 
   String? selectedMeal;
-  String foodType = '';
-  int quantity = 1;
-
+  int mealWeight = 100; // in grams
   final List<String> mealOptions = ['Breakfast', 'Lunch', 'Snack', 'Dinner'];
+  bool isFocused = false;
 
-  bool isFocused = false; // For tap focus effect
-
-  bool get isButtonEnabled {
-    if (selectedMeal == null || foodType.isEmpty) return false;
-    if (foodType == 'Countable' && quantity <= 0) return false;
-    return true;
-  }
+  bool get isButtonEnabled => selectedMeal != null && mealWeight > 0;
 
   @override
   void initState() {
@@ -52,8 +49,7 @@ class _ScanScreenState extends State<ScanScreen>
       final backCamera = cameras.firstWhere(
         (camera) => camera.lensDirection == CameraLensDirection.back,
       );
-      // Changed here to ResolutionPreset.max for high-quality capture
-      _cameraController = CameraController(backCamera, ResolutionPreset.max);
+      _cameraController = CameraController(backCamera, ResolutionPreset.medium);
       await _cameraController!.initialize();
       if (mounted) setState(() {});
     } catch (e) {
@@ -68,35 +64,76 @@ class _ScanScreenState extends State<ScanScreen>
     super.dispose();
   }
 
-  void _onScanPressed() {
+  // Resize image to prevent emulator crash
+  File _resizeImage(File file) {
+    final image = img.decodeImage(file.readAsBytesSync())!;
+    final resized = img.copyResize(image, width: 224, height: 224);
+    return File(file.path)..writeAsBytesSync(img.encodeJpg(resized));
+  }
+
+  Future<void> _onScanPressed() async {
+    if (!isButtonEnabled) return;
+
     HapticFeedback.lightImpact();
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text("Scanning...")));
-    // Add logic to process the scan and navigate if needed.
+
+    try {
+      final XFile image = await _cameraController!.takePicture();
+      final resized = _resizeImage(File(image.path));
+      _navigateToResult(resized);
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error capturing image: $e")));
+    }
+  }
+
+  Future<void> _onUploadPressed() async {
+    if (!isButtonEnabled) return;
+
+    final ImagePicker picker = ImagePicker();
+    try {
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80, // compress a bit
+      );
+      if (image != null) {
+        final resized = _resizeImage(File(image.path));
+        _navigateToResult(resized);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error selecting image: $e")));
+    }
+  }
+
+  void _navigateToResult(File image) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ResultScreen(
+          image: image,
+          mealTime: selectedMeal!,
+          mealWeight: mealWeight,
+        ),
+      ),
+    );
   }
 
   void _onScannerTap() {
-    setState(() {
-      isFocused = true;
-    });
-    // Return to normal after 1 second
+    setState(() => isFocused = true);
     Timer(const Duration(seconds: 1), () {
-      if (mounted) {
-        setState(() {
-          isFocused = false;
-        });
-      }
+      if (mounted) setState(() => isFocused = false);
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final Color primaryColor = const Color(0xFFFF7A2F);
-    final Color focusColor = const Color(
-      0xFFFFA040,
-    ); // Brighter orange on focus
-    final Color charcoal = const Color(0xFF333333);
+    final Color focusColor = const Color(0xFFFFA040);
 
     return Scaffold(
       body: _cameraController == null || !_cameraController!.value.isInitialized
@@ -105,7 +142,7 @@ class _ScanScreenState extends State<ScanScreen>
               children: [
                 CameraPreview(_cameraController!),
 
-                // Top gradient overlay
+                // Top gradient
                 Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -119,7 +156,7 @@ class _ScanScreenState extends State<ScanScreen>
                   ),
                 ),
 
-                // Top app bar
+                // Top bar
                 Positioned(
                   top: 40,
                   left: 16,
@@ -143,7 +180,7 @@ class _ScanScreenState extends State<ScanScreen>
                   ),
                 ),
 
-                // Scanner box with tap-to-focus effect
+                // Scanner box
                 Positioned(
                   top: MediaQuery.of(context).size.height * 0.25,
                   left: MediaQuery.of(context).size.width * 0.15,
@@ -164,15 +201,6 @@ class _ScanScreenState extends State<ScanScreen>
                             color: isFocused ? focusColor : Colors.white,
                             width: isFocused ? 4 : 3,
                           ),
-                          boxShadow: isFocused
-                              ? [
-                                  BoxShadow(
-                                    color: focusColor.withOpacity(0.6),
-                                    blurRadius: 8,
-                                    spreadRadius: 1,
-                                  ),
-                                ]
-                              : [],
                         ),
                         child: ScaleTransition(
                           scale: isFocused
@@ -185,7 +213,7 @@ class _ScanScreenState extends State<ScanScreen>
                   ),
                 ),
 
-                // Bottom glass container
+                // Bottom container
                 Positioned(
                   bottom: 0,
                   left: 0,
@@ -198,13 +226,11 @@ class _ScanScreenState extends State<ScanScreen>
                       filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                       child: Container(
                         padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
-                        ),
+                        color: Colors.white.withOpacity(0.15),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Dropdown for meal
+                            // Meal dropdown
                             DropdownButtonFormField<String>(
                               dropdownColor: Colors.white,
                               decoration: InputDecoration(
@@ -221,89 +247,43 @@ class _ScanScreenState extends State<ScanScreen>
                                 hintText: 'Select Meal Time',
                                 hintStyle: const TextStyle(color: Colors.white),
                               ),
-                              style: const TextStyle(
-                                color: Colors.black, // Selected item text color
-                                fontSize: 16,
-                              ),
                               value: selectedMeal,
-                              items: mealOptions.map((meal) {
-                                return DropdownMenuItem<String>(
-                                  value: meal,
-                                  child: Text(
-                                    meal,
-                                    style: const TextStyle(
-                                      color: Colors
-                                          .black, // Dropdown list item text color
+                              items: mealOptions
+                                  .map(
+                                    (meal) => DropdownMenuItem<String>(
+                                      value: meal,
+                                      child: Text(
+                                        meal,
+                                        style: const TextStyle(
+                                          color: Colors.black,
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                );
-                              }).toList(),
+                                  )
+                                  .toList(),
                               onChanged: (val) =>
                                   setState(() => selectedMeal = val),
                             ),
 
                             const SizedBox(height: 16),
 
-                            // Countable/Non-countable toggle
+                            // Meal weight
                             Container(
                               decoration: BoxDecoration(
                                 color: Colors.white.withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(20),
                               ),
-                              child: Row(
-                                children: ['Countable', 'Non-countable'].map((
-                                  type,
-                                ) {
-                                  bool isSelected = foodType == type;
-                                  return Expanded(
-                                    child: GestureDetector(
-                                      onTap: () =>
-                                          setState(() => foodType = type),
-                                      child: AnimatedContainer(
-                                        duration: const Duration(
-                                          milliseconds: 200,
-                                        ),
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 12,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: isSelected
-                                              ? primaryColor
-                                              : Colors.transparent,
-                                          borderRadius: BorderRadius.circular(
-                                            20,
-                                          ),
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            type,
-                                            style: TextStyle(
-                                              color: isSelected
-                                                  ? Colors.white
-                                                  : charcoal,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                }).toList(),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
                               ),
-                            ),
-
-                            const SizedBox(height: 16),
-
-                            // Quantity input
-                            if (foodType == 'Countable')
-                              Row(
+                              child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   IconButton(
                                     onPressed: () {
-                                      if (quantity > 0) {
-                                        setState(() => quantity--);
-                                      }
+                                      if (mealWeight > 10) mealWeight -= 10;
+                                      setState(() {});
                                     },
                                     icon: const Icon(
                                       Icons.remove_circle_outline,
@@ -311,14 +291,18 @@ class _ScanScreenState extends State<ScanScreen>
                                     ),
                                   ),
                                   Text(
-                                    '$quantity',
+                                    '$mealWeight g',
                                     style: const TextStyle(
                                       fontSize: 20,
                                       color: Colors.white,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                   IconButton(
-                                    onPressed: () => setState(() => quantity++),
+                                    onPressed: () {
+                                      mealWeight += 10;
+                                      setState(() {});
+                                    },
                                     icon: const Icon(
                                       Icons.add_circle_outline,
                                       color: Colors.white,
@@ -326,25 +310,51 @@ class _ScanScreenState extends State<ScanScreen>
                                   ),
                                 ],
                               ),
+                            ),
 
                             const SizedBox(height: 16),
 
-                            // Scan button
-                            ElevatedButton.icon(
-                              onPressed: isButtonEnabled
-                                  ? _onScanPressed
-                                  : null,
-                              icon: const Icon(Icons.camera_alt),
-                              label: const Text("Scan Food"),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: isButtonEnabled
-                                    ? primaryColor
-                                    : Colors.grey.shade600,
-                                minimumSize: const Size.fromHeight(50),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(30),
+                            // Buttons
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: isButtonEnabled
+                                        ? _onScanPressed
+                                        : null,
+                                    icon: const Icon(Icons.camera_alt),
+                                    label: const Text("Scan Food"),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: isButtonEnabled
+                                          ? primaryColor
+                                          : Colors.grey.shade600,
+                                      minimumSize: const Size.fromHeight(50),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(30),
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: isButtonEnabled
+                                        ? _onUploadPressed
+                                        : null,
+                                    icon: const Icon(Icons.photo_library),
+                                    label: const Text("Upload Image"),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: isButtonEnabled
+                                          ? primaryColor
+                                          : Colors.grey.shade600,
+                                      minimumSize: const Size.fromHeight(50),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(30),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
