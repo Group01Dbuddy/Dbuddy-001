@@ -86,9 +86,7 @@ flutter:
     - assets/images/profile_placeholder.jpg
     - assets/images/Dbuddy.png
     - assets/images/bg.jpg
-    - assets/ml_parts/class_names.json
-    - assets/ml_parts/food_b7_final_fp16.tflite
-    - assets/ml_parts/food_calories.json
+
 
   fonts:
     - family: finger

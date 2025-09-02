@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -24,6 +25,32 @@ class _ResultScreenState extends State<ResultScreen> {
   Map<String, dynamic>? _nutritionInfo;
   bool _isLoading = true;
 
+  final List<String> highCalorieSuggestions = [
+    "Opt for a smaller portion of rice and curry to reduce calorie intake.",
+    "Choose fish ambul thiyal instead of meat curry for a lighter option.",
+    "Incorporate more vegetables like gotukola salad into your meal.",
+    "Drink plain water or herbal tea instead of sugary beverages.",
+    "Try fruit-based desserts like mango or papaya for a lighter treat.",
+    "Use coconut milk sparingly in your curries.",
+    "Skip the ghee or use a low-fat version in cooking.",
+    "Replace white rice with red rice or millet.",
+    "Have a side salad with coconut sambol.",
+    "Walk after eating to burn some calories.",
+  ];
+
+  final List<String> lowCalorieSuggestions = [
+    "Add a serving of nuts like cashews for healthy fats.",
+    "Include avocado in your meal for creaminess and calories.",
+    "Have a piece of whole grain bread or roti.",
+    "Add cheese or yogurt to your dish for protein and calories.",
+    "Include a smoothie with local fruits like passion fruit.",
+    "Eat a handful of dried fruits like raisins.",
+    "Add coconut oil to your vegetables.",
+    "Have a small piece of Sri Lankan halwa or chocolate.",
+    "Include beans or lentils in your curry for fiber and calories.",
+    "Drink a glass of buffalo milk or lassi.",
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -32,7 +59,7 @@ class _ResultScreenState extends State<ResultScreen> {
 
   Future<void> _sendImageForPrediction() async {
     final uri = Uri.parse(
-      'https://c3d487f13354.ngrok-free.app/predict',
+      'https://9fd51852d76c.ngrok-free.app/predict',
     ); // Replace with your ngrok URL
     final request = http.MultipartRequest('POST', uri);
 
@@ -150,32 +177,76 @@ class _ResultScreenState extends State<ResultScreen> {
                               ),
                             ),
                             const SizedBox(height: 16),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                _buildNutritionItem(
-                                  'Calories',
-                                  '${_nutritionInfo!['calories_per_100g']} kcal',
-                                ),
-                                _buildNutritionItem(
-                                  'Carbs',
-                                  '${_nutritionInfo!['carbs']}g',
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                _buildNutritionItem(
-                                  'Protein',
-                                  '${_nutritionInfo!['protein']}g',
-                                ),
-                                _buildNutritionItem(
-                                  'Fat',
-                                  '${_nutritionInfo!['fat']}g',
-                                ),
-                              ],
+                            // Calculate scaled nutrition based on meal weight
+                            Builder(
+                              builder: (context) {
+                                double scale = widget.mealWeight / 100.0;
+                                double scaledCalories =
+                                    _nutritionInfo!['calories_per_100g'] *
+                                    scale;
+                                double scaledCarbs =
+                                    _nutritionInfo!['carbs'] * scale;
+                                double scaledProtein =
+                                    _nutritionInfo!['protein'] * scale;
+                                double scaledFat =
+                                    _nutritionInfo!['fat'] * scale;
+                                String? suggestion;
+                                if (scaledCalories > 800) {
+                                  suggestion =
+                                      highCalorieSuggestions[Random().nextInt(
+                                        highCalorieSuggestions.length,
+                                      )];
+                                } else if (scaledCalories < 300) {
+                                  suggestion =
+                                      lowCalorieSuggestions[Random().nextInt(
+                                        lowCalorieSuggestions.length,
+                                      )];
+                                }
+                                return Column(
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceEvenly,
+                                      children: [
+                                        _buildNutritionItem(
+                                          'Calories',
+                                          '${scaledCalories.toStringAsFixed(1)} kcal',
+                                        ),
+                                        _buildNutritionItem(
+                                          'Carbs',
+                                          '${scaledCarbs.toStringAsFixed(1)}g',
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceEvenly,
+                                      children: [
+                                        _buildNutritionItem(
+                                          'Protein',
+                                          '${scaledProtein.toStringAsFixed(1)}g',
+                                        ),
+                                        _buildNutritionItem(
+                                          'Fat',
+                                          '${scaledFat.toStringAsFixed(1)}g',
+                                        ),
+                                      ],
+                                    ),
+                                    if (suggestion != null) ...[
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        suggestion,
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.blue,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ],
+                                );
+                              },
                             ),
                           ],
                         ),
