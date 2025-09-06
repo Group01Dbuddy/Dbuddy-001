@@ -5,6 +5,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // <--- NEW: Import Firebase Auth
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -437,6 +440,131 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return "Obese";
   }
 
+  Future<void> _generateAndDownloadPdf(List<QueryDocumentSnapshot> docs) async {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Container(
+            padding: const pw.EdgeInsets.all(20),
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColors.orange, width: 2),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'Dbuddy',
+                  style: pw.TextStyle(
+                    fontSize: 32,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.orange,
+                  ),
+                ),
+                pw.SizedBox(height: 10),
+                pw.Text(
+                  'Monthly Calorie Progress Report',
+                  style: pw.TextStyle(
+                    fontSize: 24,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 10),
+                pw.Text('Name: $userName', style: pw.TextStyle(fontSize: 16)),
+                pw.Text('Age: $age', style: pw.TextStyle(fontSize: 16)),
+                pw.Text(
+                  'Report Date: ${DateTime.now().toString().split(' ')[0]}',
+                  style: pw.TextStyle(fontSize: 16),
+                ),
+                pw.SizedBox(height: 20),
+                pw.Text(
+                  'Daily Intake (Last 30 Days)',
+                  style: pw.TextStyle(
+                    fontSize: 18,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 10),
+                pw.Table(
+                  border: pw.TableBorder.all(color: PdfColors.grey),
+                  children: [
+                    pw.TableRow(
+                      children: [
+                        pw.Container(
+                          padding: const pw.EdgeInsets.all(5),
+                          child: pw.Text(
+                            'Date',
+                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          ),
+                        ),
+                        pw.Container(
+                          padding: const pw.EdgeInsets.all(5),
+                          child: pw.Text(
+                            'Calories',
+                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          ),
+                        ),
+                        pw.Container(
+                          padding: const pw.EdgeInsets.all(5),
+                          child: pw.Text(
+                            'Water',
+                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                    ...docs.map((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final date = (data['date'] as Timestamp?)?.toDate();
+                      final consumedCalories = data['consumedCalories'] ?? 0;
+                      final waterIntake = data['waterIntake'] ?? 0;
+                      return pw.TableRow(
+                        children: [
+                          pw.Container(
+                            padding: const pw.EdgeInsets.all(5),
+                            child: pw.Text(
+                              date != null
+                                  ? '${date.month}/${date.day}/${date.year}'
+                                  : 'Unknown Date',
+                            ),
+                          ),
+                          pw.Container(
+                            padding: const pw.EdgeInsets.all(5),
+                            child: pw.Text('$consumedCalories Kcal'),
+                          ),
+                          pw.Container(
+                            padding: const pw.EdgeInsets.all(5),
+                            child: pw.Text('$waterIntake cups'),
+                          ),
+                        ],
+                      );
+                    }),
+                  ],
+                ),
+                pw.SizedBox(height: 20),
+                pw.Text(
+                  '"Keep up the great work! Stay healthy, stay fit, and keep achieving your goals!"',
+                  style: pw.TextStyle(
+                    fontSize: 14,
+                    fontStyle: pw.FontStyle.italic,
+                    color: PdfColors.orange,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    await Printing.sharePdf(
+      bytes: await pdf.save(),
+      filename: 'monthly_progress.pdf',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final Color primaryColor = const Color.fromARGB(255, 246, 124, 42);
@@ -731,7 +859,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       borderRadius: BorderRadius.circular(12),
                                       onTap: () => Navigator.pushNamed(
                                         context,
-                                        '/monthly_progress',
+                                        '/monthly_progress_screen',
                                       ),
                                       child: Padding(
                                         padding: const EdgeInsets.symmetric(
@@ -776,17 +904,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           vertical: 12,
                                         ),
                                       ),
-                                      onPressed: () {
-                                        // Placeholder for PDF download logic.
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              "Download PDF clicked",
+                                      onPressed: () async {
+                                        final user =
+                                            FirebaseAuth.instance.currentUser;
+                                        if (user == null) return;
+
+                                        final thirtyDaysAgo = DateTime.now()
+                                            .subtract(const Duration(days: 30));
+
+                                        final querySnapshot =
+                                            await FirebaseFirestore.instance
+                                                .collection('users')
+                                                .doc(user.uid)
+                                                .collection(
+                                                  'user_daily_progress',
+                                                )
+                                                .where(
+                                                  'date',
+                                                  isGreaterThanOrEqualTo:
+                                                      Timestamp.fromDate(
+                                                        thirtyDaysAgo,
+                                                      ),
+                                                )
+                                                .orderBy(
+                                                  'date',
+                                                  descending: true,
+                                                )
+                                                .get();
+
+                                        if (querySnapshot.docs.isNotEmpty) {
+                                          await _generateAndDownloadPdf(
+                                            querySnapshot.docs,
+                                          );
+                                        } else {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'No data available for PDF',
+                                              ),
                                             ),
-                                          ),
-                                        );
+                                          );
+                                        }
                                       },
                                       icon: Icon(
                                         Icons.download,
@@ -809,7 +969,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         borderRadius: BorderRadius.circular(12),
                                         onTap: () => Navigator.pushNamed(
                                           context,
-                                          '/monthly_progress',
+                                          '/monthly_progress_screen',
                                         ),
                                         child: Padding(
                                           padding: const EdgeInsets.symmetric(
@@ -855,17 +1015,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           vertical: 12,
                                         ),
                                       ),
-                                      onPressed: () {
-                                        // Placeholder for PDF download logic.
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              "Download PDF clicked",
+                                      onPressed: () async {
+                                        final user =
+                                            FirebaseAuth.instance.currentUser;
+                                        if (user == null) return;
+
+                                        final thirtyDaysAgo = DateTime.now()
+                                            .subtract(const Duration(days: 30));
+
+                                        final querySnapshot =
+                                            await FirebaseFirestore.instance
+                                                .collection('users')
+                                                .doc(user.uid)
+                                                .collection(
+                                                  'user_daily_progress',
+                                                )
+                                                .where(
+                                                  'date',
+                                                  isGreaterThanOrEqualTo:
+                                                      Timestamp.fromDate(
+                                                        thirtyDaysAgo,
+                                                      ),
+                                                )
+                                                .orderBy(
+                                                  'date',
+                                                  descending: true,
+                                                )
+                                                .get();
+
+                                        if (querySnapshot.docs.isNotEmpty) {
+                                          await _generateAndDownloadPdf(
+                                            querySnapshot.docs,
+                                          );
+                                        } else {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'No data available for PDF',
+                                              ),
                                             ),
-                                          ),
-                                        );
+                                          );
+                                        }
                                       },
                                       icon: Icon(
                                         Icons.download,

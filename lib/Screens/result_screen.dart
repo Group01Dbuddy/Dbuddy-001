@@ -3,6 +3,8 @@ import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ResultScreen extends StatefulWidget {
   final File image;
@@ -59,7 +61,7 @@ class _ResultScreenState extends State<ResultScreen> {
 
   Future<void> _sendImageForPrediction() async {
     final uri = Uri.parse(
-      'https://9fd51852d76c.ngrok-free.app/predict',
+      'https://947c474ef8bf.ngrok-free.app/predict',
     ); // Replace with your ngrok URL
     final request = http.MultipartRequest('POST', uri);
 
@@ -270,7 +272,84 @@ class _ResultScreenState extends State<ResultScreen> {
                       const SizedBox(width: 16),
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: () {
+                          onPressed: () async {
+                            if (_nutritionInfo == null ||
+                                _predictedFood == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('No data to save!'),
+                                ),
+                              );
+                              return;
+                            }
+                            final user = FirebaseAuth.instance.currentUser;
+                            if (user == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Please log in to save!'),
+                                ),
+                              );
+                              return;
+                            }
+                            double scale = widget.mealWeight / 100.0;
+                            double scaledCalories =
+                                _nutritionInfo!['calories_per_100g'] * scale;
+                            // Save meal
+                            await FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(user.uid)
+                                .collection('meals')
+                                .add({
+                                  'food': _predictedFood,
+                                  'calories': scaledCalories,
+                                  'date': Timestamp.now(),
+                                  'mealTime': widget.mealTime,
+                                  'weight': widget.mealWeight,
+                                });
+                            // Update daily progress
+                            DateTime now = DateTime.now();
+                            DateTime startOfDay = DateTime(
+                              now.year,
+                              now.month,
+                              now.day,
+                            );
+                            DateTime endOfDay = startOfDay.add(
+                              const Duration(days: 1),
+                            );
+                            Timestamp startTs = Timestamp.fromDate(startOfDay);
+                            Timestamp endTs = Timestamp.fromDate(endOfDay);
+                            QuerySnapshot progressQuery =
+                                await FirebaseFirestore.instance
+                                    .collection('users')
+                                    .doc(user.uid)
+                                    .collection('user_daily_progress')
+                                    .where(
+                                      'date',
+                                      isGreaterThanOrEqualTo: startTs,
+                                    )
+                                    .where('date', isLessThan: endTs)
+                                    .get();
+                            if (progressQuery.docs.isNotEmpty) {
+                              // Update existing
+                              DocumentReference docRef =
+                                  progressQuery.docs.first.reference;
+                              await docRef.update({
+                                'consumedCalories': FieldValue.increment(
+                                  scaledCalories,
+                                ),
+                              });
+                            } else {
+                              // Create new
+                              await FirebaseFirestore.instance
+                                  .collection('users')
+                                  .doc(user.uid)
+                                  .collection('user_daily_progress')
+                                  .add({
+                                    'date': startTs,
+                                    'consumedCalories': scaledCalories,
+                                    'waterIntake': 0,
+                                  });
+                            }
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Saved to history!'),

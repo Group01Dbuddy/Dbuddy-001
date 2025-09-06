@@ -1,4 +1,5 @@
 import 'package:dbuddy/Screens/dash_board_screen.dart';
+import 'package:dbuddy/Screens/monthly_progress_screen.dart';
 import 'package:dbuddy/Screens/notification_screen.dart';
 import 'package:dbuddy/Screens/profile_screen.dart';
 import 'package:dbuddy/Screens/scan_screen.dart';
@@ -37,6 +38,8 @@ class MyApp extends StatelessWidget {
         '/profile_screen': (context) => const ProfileScreen(),
         '/dashboard_screen': (context) => const DashboardScreen(),
         '/notification_screen': (context) => const NotificationScreen(),
+        '/monthly_progress_screen': (context) =>
+            const MonthlyProgressScreen(), // Placeholder for monthly progress screen
       },
     );
   }
