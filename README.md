@@ -84,8 +84,7 @@ Traditional calorie-tracking apps do not recognize Sri Lankan foods and require 
 | UI/UX       | Figma                               |
 | Mobile App  | Flutter (Dart)                      |
 | ML Model    | TFLite (EfficientNetB7 pre-trained) |
-| Backend     | Firebase Firestore & Auth           |
-| PDF Reports | Flutter pdf & printing packages     |
+| Backend     | Firebase Firestore & Auth           |    |
 
 ---
 
