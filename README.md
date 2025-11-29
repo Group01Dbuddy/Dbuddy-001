@@ -108,7 +108,9 @@ Traditional calorie-tracking apps do not recognize Sri Lankan foods and require 
 * G.T.S. Madhuwanthi
 
 ---
+![Uploading Gemini_Generated_Image_1qcx381qcx381qcx.png…]()
 
+---
 ## 📄 License
 
 This project is developed for academic purposes under the **University of Sri Jayewardenepura – Faculty of Technology**.
